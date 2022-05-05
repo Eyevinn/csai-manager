@@ -28,6 +28,7 @@ export interface ICSAIManagerOptions {
 
 export class CSAIManager extends EmitterBaseClass {
   private debug = false;
+  private initOptions: ICSAIManagerOptions;
 
   private contentVideoElement: HTMLVideoElement;
   private adVideoElement: HTMLVideoElement;
@@ -62,6 +63,7 @@ export class CSAIManager extends EmitterBaseClass {
   constructor(initOptions: ICSAIManagerOptions) {
     super();
     this.debug = !!initOptions.debug;
+    this.initOptions = initOptions;
 
     this.adServerService = new AdServerService(this.debug);
     initOptions = validateInitOptions(initOptions);
@@ -350,10 +352,24 @@ export class CSAIManager extends EmitterBaseClass {
   }
 
   destroy() {
+    this.adBreaks = [];
+    this.adMarkers = [];
+
     this.currentAd = null;
     this.currentAdBreak = null;
-    this.onAdSeekingRef = null;
+    this.currentAdBreakVideos = [];
+
     this.onContentTimeUpdateRef = null;
+    this.onAdSeekingRef = null;
+
+    this.trackedAdBreaks = {};
+    this.trackedAds = {};
+
     this.videoEventFilter.clear();
+    this.videoEventFilter.destroy();
+    // if not sent in as a video element already in DOM, let's remove the created ad video element as well
+    if (!this.initOptions.adVideoElement) {
+      this.adVideoElement.remove();
+    }
   }
 }
