@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CSAI Manager</title>
+  <script type="module" src="demo.js"></script>
+</head>
+
+<body>
+  <div id="wrapper">
+
+    <script async type="text/javascript"
+      src="https://unpkg.com/@eyevinn/web-player-component@0.6.1/dist/web-player.component.js"></script>
+    <eyevinn-video
+      source="https://redbee.ctl.cdn.ebsd.ericsson.net/eyevinn/stswe/assets/aebaa3f0-1065-11ea-9384-053acb2c6404_29C72F/materials/3lpMXs9fnr_29C72F/vod-idx.ism/.m3u8?"
+      muted autoplay></eyevinn-video>
+
+      <!-- live video -->
+      <!-- <eyevinn-video
+        source="https://d2fz24s2fts31b.cloudfront.net/out/v1/6484d7c664924b77893f9b4f63080e5d/manifest.m3u8"
+        muted autoplay></eyevinn-video> -->
+  </div>
+  <style>
+    #wrapper {
+      width: 100%;
+      max-width: 800px;
+      margin: 0 auto;
+    }
+
+    video {
+      width: 100%;
+    }
+  </style>
+</body>
+
+</html>
