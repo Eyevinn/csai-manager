@@ -15,6 +15,7 @@ import { VideoEventFilter, PlayerEvents } from "@eyevinn/video-event-filter";
 export interface ICSAIManagerOptions {
   contentVideoElement: HTMLVideoElement;
   autoManagePlayback?: boolean;
+  autoplay?: boolean;
   isLive?: boolean;
 
   container?: HTMLElement;
@@ -29,6 +30,8 @@ export interface ICSAIManagerOptions {
 export class CSAIManager extends EmitterBaseClass {
   private debug = false;
   private initOptions: ICSAIManagerOptions;
+
+  private state: "idle" | "playing" | "paused" | "ended";
 
   private contentVideoElement: HTMLVideoElement;
   private adVideoElement: HTMLVideoElement;
@@ -65,6 +68,8 @@ export class CSAIManager extends EmitterBaseClass {
     this.debug = !!initOptions.debug;
     this.initOptions = initOptions;
 
+    this.state = "idle";
+
     this.adServerService = new AdServerService(this.debug);
     initOptions = validateInitOptions(initOptions);
 
@@ -76,7 +81,9 @@ export class CSAIManager extends EmitterBaseClass {
     this.adVideoElement = this.setupAdVideoElement(initOptions);
     this.videoEventFilter = new VideoEventFilter(this.adVideoElement);
 
-    this.autoManagePlayback = initOptions.autoManagePlayback;
+    this.autoManagePlayback = initOptions.autoManagePlayback
+      ? initOptions.autoManagePlayback
+      : true;
 
     this.fetchAds(initOptions);
   }
@@ -108,6 +115,12 @@ export class CSAIManager extends EmitterBaseClass {
     this.adBreaks = this.adBreaks.sort((a, b) => a.timeOffset - b.timeOffset);
     this.adMarkers = this.adBreaks.map((adBreak) => adBreak.timeOffset);
     this.start();
+  }
+
+  public play(): void {
+    if (this.state !== "idle") return;
+    this.state = "playing";
+    this.playNextVideo();
   }
 
   public async fetchAdBreak(vastUrl: string): Promise<void> {
@@ -174,13 +187,17 @@ export class CSAIManager extends EmitterBaseClass {
     this.currentAd = ad;
     this.adVideoElement.style.display = "block";
     this.adVideoElement.src = src;
-    this.adVideoElement.play();
+
+    if (this.state !== "idle" || this.initOptions.autoplay) {
+      this.adVideoElement.play();
+    }
 
     this.adVideoElement.addEventListener(
       "playing",
       () => {
         this.trackEvent(AdTrackingEvent.START, this.currentAd);
         this.trackEvent(AdTrackingEvent.IMPRESSION, this.currentAd);
+        this.state = "playing";
       },
       { once: true }
     );
@@ -188,6 +205,7 @@ export class CSAIManager extends EmitterBaseClass {
       "ended",
       () => {
         this.trackEvent(AdTrackingEvent.COMPLETE, this.currentAd);
+        this.state = "ended";
         this.validCurrentTime = 0;
         this.playNextVideo();
       },

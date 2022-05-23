@@ -36,6 +36,7 @@ export interface ICSAIManagerOptions {
   contentVideoElement: HTMLVideoElement;
   autoManagePlayback?: boolean; // default true; whether you want the manager to pause/play the content, or if you want to act on the events
   isLive?: boolean; // default false; will adjust the validation to not require vast or vmap url etc
+  autoplay?: boolean; // default false
 
   // Whether you have created a video element for the ads on beforehand, or would want to render it in a div. As fallback it finds the parent of the contentVideoElement
   container?: HTMLElement;
@@ -113,6 +114,8 @@ export enum AdBreakTrackingEvent {
 ```
 
 ### Methods
+
+- `play()` to trigger play when autoplay isn't set to true
 
 These methods are specifically to be used for live
 (remember to set the initOption `autoManagePlayback` to `false` to not pause the live stream)
