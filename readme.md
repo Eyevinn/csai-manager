@@ -27,6 +27,8 @@ videoElement.addEventListener("ended", () => {
 });
 ```
 
+If you *do not* send in an already created ad video element (through the available option listed below), but let the library create the element, you will need to set the container to `position: relative;` as the CSAI Manager will try to position the new element absolute edge to edge of the container.
+
 ### Available Options
 
 ```ts
