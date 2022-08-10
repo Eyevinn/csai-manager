@@ -21,6 +21,7 @@ export function createAdVideoElement(
   adVideoElement.style.backgroundColor = "black";
   adVideoElement.style.display = "none";
   if (contentVideoElement) {
+    adVideoElement.playsInline = contentVideoElement.playsInline;
     adVideoElement.muted = contentVideoElement.muted;
     adVideoElement.volume = contentVideoElement.volume;
   }
