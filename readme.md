@@ -132,11 +132,13 @@ These methods are specifically to be used for live
 const videoElement = document.querySelector("video");
 const csaiManager = new CSAIManager(opts);
 
+// dummy elements
 const playButton = document.querySelector("button#play");
 const pauseButton = document.querySelector("button#pause");
 const mediaPlaying = "content";
 
 csaiManager.on("*", (event, data) => {
+  // we switch content type based on the knowledge of when the ad break starts and ends
   if (event === "breakStart") {
     mediaPlaying = "ads";
   }
@@ -146,17 +148,21 @@ csaiManager.on("*", (event, data) => {
 });
 
 playButton.addEventListener("click", () => {
+  // if content - interact with your standard content player
   if (mediaPlaying === "content") {
       videoElement.play()    
   }
+  // if ads - interact with the CSAI manager
   if (mediaPlaying === "ads") {
     csaiManager.play();
   }
 });
 pauseButton.addEventListener("click", () => {
+  // if content - interact with your standard content player
   if (mediaPlaying === "content") {
       videoElement.pause()    
   }
+  // if ads - interact with the CSAI manager
   if (mediaPlaying === "ads") {
     csaiManager.pause();
   }
