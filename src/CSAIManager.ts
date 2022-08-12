@@ -37,7 +37,7 @@ export class CSAIManager extends EmitterBaseClass {
   private adVideoElement: HTMLVideoElement;
   private autoManagePlayback = true;
 
-  private videoEventFilter: VideoEventFilter;
+  private adVideoEventFilter: VideoEventFilter;
 
   private adServerService: AdServerService;
   private adBreaks: IAdBreak[] = [];
@@ -47,6 +47,7 @@ export class CSAIManager extends EmitterBaseClass {
   private currentAdBreakVideos: IAd[] = [];
   private currentAd: IAd;
 
+  private onContentVolumeChangeRef: any;
   private onContentTimeUpdateRef: any;
   private onAdSeekingRef: any;
 
@@ -79,7 +80,12 @@ export class CSAIManager extends EmitterBaseClass {
 
     this.contentVideoElement = initOptions.contentVideoElement;
     this.adVideoElement = this.setupAdVideoElement(initOptions);
-    this.videoEventFilter = new VideoEventFilter(this.adVideoElement);
+    this.adVideoEventFilter = new VideoEventFilter(this.adVideoElement);
+    // we should try to match the settings of the content video element if changed through e.g. a skin implementation
+    this.contentVideoElement.addEventListener(
+      "volumechange",
+      (this.onContentVolumeChangeRef = this.onContentVolumeChange.bind(this))
+    );
 
     this.autoManagePlayback = initOptions.autoManagePlayback
       ? initOptions.autoManagePlayback
@@ -118,9 +124,18 @@ export class CSAIManager extends EmitterBaseClass {
   }
 
   public play(): void {
-    if (this.state !== "idle") return;
-    this.state = "playing";
-    this.playNextVideo();
+    if (this.state === "idle") {
+      this.state = "playing";
+      this.playNextVideo();
+    }
+    if (this.state === "paused") {
+      this.adVideoElement.play();
+    }
+  }
+
+  public pause(): void {
+    if (this.state !== "playing") return;
+    this.adVideoElement.pause();
   }
 
   public async fetchAdBreak(vastUrl: string): Promise<void> {
@@ -167,7 +182,7 @@ export class CSAIManager extends EmitterBaseClass {
   }
 
   private playNextVideo() {
-    this.videoEventFilter.clear();
+    this.adVideoEventFilter.clear();
     this.adVideoElement.removeEventListener("seeking", this.onAdSeekingRef);
 
     const ad = this.currentAdBreakVideos.shift();
@@ -212,19 +227,21 @@ export class CSAIManager extends EmitterBaseClass {
       { once: true }
     );
 
-    this.videoEventFilter.addEventListener(PlayerEvents.TimeUpdate, () => {
+    this.adVideoEventFilter.addEventListener(PlayerEvents.TimeUpdate, () => {
       if (!this.adVideoElement.seeking) {
         this.validCurrentTime = this.adVideoElement.currentTime;
       }
       this.monitorProgress();
     });
-    this.videoEventFilter.addEventListener(PlayerEvents.Pause, () => {
+    this.adVideoEventFilter.addEventListener(PlayerEvents.Pause, () => {
+      this.state = "paused";
       this.trackEvent(AdTrackingEvent.PAUSE, this.currentAd);
     });
-    this.videoEventFilter.addEventListener(PlayerEvents.Resume, () => {
+    this.adVideoEventFilter.addEventListener(PlayerEvents.Resume, () => {
+      this.state = "playing";
       this.trackEvent(AdTrackingEvent.RESUME, this.currentAd);
     });
-    this.videoEventFilter.addEventListener(PlayerEvents.Error, () => {
+    this.adVideoEventFilter.addEventListener(PlayerEvents.Error, () => {
       this.trackEvent(AdTrackingEvent.ERROR, this.currentAd);
     });
 
@@ -270,6 +287,11 @@ export class CSAIManager extends EmitterBaseClass {
       "timeupdate",
       (this.onContentTimeUpdateRef = this.onContentTimeUpdate.bind(this))
     );
+  }
+
+  private onContentVolumeChange() {
+    this.adVideoElement.muted = this.contentVideoElement.muted;
+    this.adVideoElement.volume = this.contentVideoElement.volume;
   }
 
   private onContentTimeUpdate() {
@@ -377,14 +399,15 @@ export class CSAIManager extends EmitterBaseClass {
     this.currentAdBreak = null;
     this.currentAdBreakVideos = [];
 
+    this.onContentVolumeChangeRef = null;
     this.onContentTimeUpdateRef = null;
     this.onAdSeekingRef = null;
 
     this.trackedAdBreaks = {};
     this.trackedAds = {};
 
-    this.videoEventFilter.clear();
-    this.videoEventFilter.destroy();
+    this.adVideoEventFilter.clear();
+    this.adVideoEventFilter.destroy();
     // if not sent in as a video element already in DOM, let's remove the created ad video element as well
     if (!this.initOptions.adVideoElement) {
       this.adVideoElement.remove();
