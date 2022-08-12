@@ -117,10 +117,48 @@ export enum AdBreakTrackingEvent {
 
 ### Methods
 
-- `play()` to trigger play when autoplay isn't set to true
+- `play()` to trigger play when autoplay isn't set to true or play when paused
+- `pause()` to pause the ad video playback
 
 These methods are specifically to be used for live
 (remember to set the initOption `autoManagePlayback` to `false` to not pause the live stream)
 
 - `fetchAdBreak(vastUrl: string): Promise<void>`
 - `triggerAdBreak(): Promise<void>`
+
+### Example usage with custom skin
+
+```js
+const videoElement = document.querySelector("video");
+const csaiManager = new CSAIManager(opts);
+
+const playButton = document.querySelector("button#play");
+const pauseButton = document.querySelector("button#pause");
+const mediaPlaying = "content";
+
+csaiManager.on("*", (event, data) => {
+  if (event === "breakStart") {
+    mediaPlaying = "ads";
+  }
+  if (event === "breakEnd") {
+    mediaPlaying = "content";
+  }
+});
+
+playButton.addEventListener("click", () => {
+  if (mediaPlaying === "content") {
+      videoElement.play()    
+  }
+  if (mediaPlaying === "ads") {
+    csaiManager.play();
+  }
+});
+pauseButton.addEventListener("click", () => {
+  if (mediaPlaying === "content") {
+      videoElement.pause()    
+  }
+  if (mediaPlaying === "ads") {
+    csaiManager.pause();
+  }
+});
+```
