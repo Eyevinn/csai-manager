@@ -135,7 +135,8 @@ const csaiManager = new CSAIManager(opts);
 // dummy elements
 const playButton = document.querySelector("button#play");
 const pauseButton = document.querySelector("button#pause");
-const mediaPlaying = "content";
+// example of keeping the state of media playing, in your code
+let mediaPlaying = "content";
 
 csaiManager.on("*", (event, data) => {
   // we switch content type based on the knowledge of when the ad break starts and ends
