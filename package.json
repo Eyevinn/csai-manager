@@ -25,7 +25,7 @@
   "dependencies": {
     "@dailymotion/vast-client": "^4.0.0",
     "@dailymotion/vmap": "^3.3.0",
-    "@eyevinn/video-event-filter": "^2.0.0",
+    "@eyevinn/media-event-filter": "1.0.4",
     "mitt": "^3.0.0"
   },
   "devDependencies": {
