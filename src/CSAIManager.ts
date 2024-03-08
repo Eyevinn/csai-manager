@@ -1,16 +1,10 @@
 import { AdServerService } from "./AdServerService";
-import {
-  AdBreakTrackingEvent,
-  AdTrackingEvent,
-  IAd,
-  IAdBreak,
-  IAdBreakVASTItem,
-} from "./utils/ads-models";
+import { AdBreakTrackingEvent, AdTrackingEvent, IAd, IAdBreak, IAdBreakVASTItem } from "./utils/ads-models";
 import { EmitterBaseClass } from "./utils/EmitterBaseClass";
 import { createAdVideoElement } from "./utils/helpers";
 import { validateInitOptions } from "./utils/validations";
 
-import { VideoEventFilter, PlayerEvents } from "@eyevinn/video-event-filter";
+import { FilteredMediaEvent, getMediaEventFilter, TMediaEventFilter } from "@eyevinn/media-event-filter";
 
 export interface ICSAIManagerOptions {
   contentVideoElement: HTMLVideoElement;
@@ -37,7 +31,7 @@ export class CSAIManager extends EmitterBaseClass {
   private adVideoElement: HTMLVideoElement;
   private autoManagePlayback = true;
 
-  private adVideoEventFilter: VideoEventFilter;
+  private adVideoEventFilter: TMediaEventFilter;
 
   private adServerService: AdServerService;
   private adBreaks: IAdBreak[] = [];
@@ -50,6 +44,7 @@ export class CSAIManager extends EmitterBaseClass {
   private onContentVolumeChangeRef: any;
   private onContentTimeUpdateRef: any;
   private onAdSeekingRef: any;
+  private initialPlayFired = false;
 
   private validCurrentTime = 0;
 
@@ -80,7 +75,8 @@ export class CSAIManager extends EmitterBaseClass {
 
     this.contentVideoElement = initOptions.contentVideoElement;
     this.adVideoElement = this.setupAdVideoElement(initOptions);
-    this.adVideoEventFilter = new VideoEventFilter(this.adVideoElement);
+    this.adVideoEventFilter = this.setUpEventFilter();
+
     // we should try to match the settings of the content video element if changed through e.g. a skin implementation
     this.contentVideoElement.addEventListener(
       "volumechange",
@@ -92,6 +88,46 @@ export class CSAIManager extends EmitterBaseClass {
       : true;
 
     this.fetchAds(initOptions);
+  }
+
+  private setUpEventFilter(): TMediaEventFilter {
+    this.adVideoEventFilter?.teardown();
+
+    return getMediaEventFilter({
+      videoElement: this.adVideoElement,
+      allowResumeAfterEnded: true,
+      callback: (event) => {
+        switch (event) {
+          case FilteredMediaEvent.TIME_UPDATE:
+            if (!this.adVideoElement.seeking) {
+              this.validCurrentTime = this.adVideoElement.currentTime;
+            }
+            this.monitorProgress();
+            break;
+          case FilteredMediaEvent.ENDED:
+            this.trackEvent(AdTrackingEvent.COMPLETE, this.currentAd);
+            this.state = "ended";
+            this.validCurrentTime = 0;
+            this.playNextVideo();
+            break;
+          case FilteredMediaEvent.PAUSE:
+            this.state = "paused";
+            this.trackEvent(AdTrackingEvent.PAUSE, this.currentAd);
+            break;
+          case FilteredMediaEvent.PLAYING:
+            this.state = "playing";
+
+            if (!this.initialPlayFired) {
+              this.initialPlayFired = true;
+              this.trackEvent(AdTrackingEvent.START, this.currentAd);
+              this.trackEvent(AdTrackingEvent.IMPRESSION, this.currentAd);
+            } else {
+              this.trackEvent(AdTrackingEvent.RESUME, this.currentAd);
+            }
+            break;
+        }
+      },
+    });
   }
 
   private setupAdVideoElement(
@@ -182,7 +218,8 @@ export class CSAIManager extends EmitterBaseClass {
   }
 
   private playNextVideo() {
-    this.adVideoEventFilter.clear();
+    this.initialPlayFired = false;
+    this.adVideoEventFilter = this.setUpEventFilter();
     this.adVideoElement.removeEventListener("seeking", this.onAdSeekingRef);
 
     const ad = this.currentAdBreakVideos.shift();
@@ -208,42 +245,12 @@ export class CSAIManager extends EmitterBaseClass {
     }
 
     this.adVideoElement.addEventListener(
-      "playing",
+      "error",
       () => {
-        this.trackEvent(AdTrackingEvent.START, this.currentAd);
-        this.trackEvent(AdTrackingEvent.IMPRESSION, this.currentAd);
-        this.state = "playing";
+        this.trackEvent(AdTrackingEvent.ERROR, this.currentAd);
       },
       { once: true }
     );
-    this.adVideoElement.addEventListener(
-      "ended",
-      () => {
-        this.trackEvent(AdTrackingEvent.COMPLETE, this.currentAd);
-        this.state = "ended";
-        this.validCurrentTime = 0;
-        this.playNextVideo();
-      },
-      { once: true }
-    );
-
-    this.adVideoEventFilter.addEventListener(PlayerEvents.TimeUpdate, () => {
-      if (!this.adVideoElement.seeking) {
-        this.validCurrentTime = this.adVideoElement.currentTime;
-      }
-      this.monitorProgress();
-    });
-    this.adVideoEventFilter.addEventListener(PlayerEvents.Pause, () => {
-      this.state = "paused";
-      this.trackEvent(AdTrackingEvent.PAUSE, this.currentAd);
-    });
-    this.adVideoEventFilter.addEventListener(PlayerEvents.Resume, () => {
-      this.state = "playing";
-      this.trackEvent(AdTrackingEvent.RESUME, this.currentAd);
-    });
-    this.adVideoEventFilter.addEventListener(PlayerEvents.Error, () => {
-      this.trackEvent(AdTrackingEvent.ERROR, this.currentAd);
-    });
 
     // this has to be native to block seek properly
     this.adVideoElement.addEventListener(
@@ -398,6 +405,7 @@ export class CSAIManager extends EmitterBaseClass {
     this.currentAd = null;
     this.currentAdBreak = null;
     this.currentAdBreakVideos = [];
+    this.initialPlayFired = false;
 
     this.onContentVolumeChangeRef = null;
     this.onContentTimeUpdateRef = null;
@@ -406,8 +414,7 @@ export class CSAIManager extends EmitterBaseClass {
     this.trackedAdBreaks = {};
     this.trackedAds = {};
 
-    this.adVideoEventFilter.clear();
-    this.adVideoEventFilter.destroy();
+    this.adVideoEventFilter.teardown();
     // if not sent in as a video element already in DOM, let's remove the created ad video element as well
     if (!this.initOptions.adVideoElement) {
       this.adVideoElement.remove();
